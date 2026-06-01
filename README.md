@@ -10,10 +10,10 @@
 
 NFD2.0拥有无限配额（自建有每日1k消息上限），且托管在[cloudflare snippets](https://developers.cloudflare.com/rules/snippets/)，理论上不会掉线。如果需要自建，参考下面的自建教程。
 
-# NFD
-No Fraud / Node Forward Bot
+# telegram-bot
+电报双向聊天机器人 / telegram Bot
 
-一个基于cloudflare worker的telegram 消息转发bot，集成了反欺诈功能
+一个基于cloudflare worker的telegram 消息转发bot，集成了反广告验证功能
 
 ## 特点
 - 基于cloudflare worker搭建，能够实现以下效果
@@ -21,7 +21,7 @@ No Fraud / Node Forward Bot
     - 不需要额外的域名，利用worker自带域名即可
     - 基于worker kv实现永久数据储存
     - 稳定，全球cdn转发
-- 接入反欺诈系统，当聊天对象有诈骗历史时，自动发出提醒
+- 接入反广告系统，转发消息前2次需要进行验证
 - 支持屏蔽用户，避免被骚扰
 
 ## 搭建方法
@@ -35,7 +35,7 @@ No Fraud / Node Forward Bot
     - 增加一个`ENV_ADMIN_UID`变量，数值为从步骤3中获得的用户id
 6. 绑定kv数据库，创建一个Namespace Name为`nfd`的kv数据库，在setting -> variable中设置`KV Namespace Bindings`：nfd -> nfd
 7. 点击`Quick Edit`，复制[这个文件](./worker.js)到编辑器中
-8. 通过打开`https://xxx.workers.dev/registerWebhook`来注册websoket
+8. 通过打开`https://xxx.workers.dev/`来注册websoket，打开后显示OK既为注册激活
 
 ## 使用方法
 - 当其他用户给bot发消息，会被转发到bot创建者
@@ -43,9 +43,11 @@ No Fraud / Node Forward Bot
 - 用户回复`/block`, `/unblock`, `/checkblock`等命令会执行相关指令，**不会**回复到原消息发送者
 
 ## 欺诈数据源
+<del>
 - 文件[fraud.db](./fraud.db)为欺诈数据，格式为每行一个uid
 - 可以通过pr扩展本数据，也可以通过提issue方式补充
 - 提供额外欺诈信息时，需要提供一定的消息出处
+</del>
 
 ## Thanks
 - [telegram-bot-cloudflare](https://github.com/cvzi/telegram-bot-cloudflare)
