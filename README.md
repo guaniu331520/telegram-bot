@@ -51,3 +51,4 @@ NFD2.0拥有无限配额（自建有每日1k消息上限），且托管在[cloud
 
 ## Thanks
 - [telegram-bot-cloudflare](https://github.com/cvzi/telegram-bot-cloudflare)
+- https://github.com/LloydAsp/nfd
