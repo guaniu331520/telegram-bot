@@ -98,7 +98,7 @@ async function handleAdminMessage(message) {
   }
 }
 
-// =============== 用户消息处理（核心修复）===============
+// =============== 用户消息处理（严格按你要求流程）===============
 async function handleGuestMessage(message) {
   const chatId = message.chat.id
   const text = (message.text || '').trim()
@@ -111,51 +111,68 @@ async function handleGuestMessage(message) {
     return normalForward(message)
   }
 
-  // 需要验证的流程
-  let verifyStep = await nfd.get(`verify_step-${chatId}`, { type: "json" }) || 0
+  // 正在等待验证码答案
   let currentAnswer = await nfd.get(`current_answer-${chatId}`)
+  let pendingMessageId = await nfd.get(`pending_msg-${chatId}`, { type: "json" })
 
-  // 正在等待验证答案
   if (currentAnswer) {
+    // 用户回复的是验证码答案
     if (text === currentAnswer) {
       await nfd.delete(`current_answer-${chatId}`)
+
+      let verifyStep = await nfd.get(`verify_step-${chatId}`, { type: "json" }) || 0
       verifyStep++
       await nfd.put(`verify_step-${chatId}`, verifyStep, { expirationTtl: 3600 })
 
       if (verifyStep === 1) {
         await sendMessage(chatId, "✅ 验证通过！\n剩余还需验证次数 1 次\n\n请继续发送您的消息。")
-        // 不转发验证答案
-        return 
+        // 转发之前的那条触发验证的消息（A消息）
+        if (pendingMessageId) {
+          await normalForwardById(chatId, pendingMessageId)
+          await nfd.delete(`pending_msg-${chatId}`)
+        }
+        return
       } 
       else if (verifyStep === 2) {
-        const expireTime = now + 7 * 24 * 60 * 60 * 1000   // 改为7天
+        const expireTime = now + 7 * 24 * 60 * 60 * 1000
         await nfd.put(`verified_until-${chatId}`, expireTime, { expirationTtl: 7 * 24 * 60 * 60 })
         await nfd.delete(`verify_step-${chatId}`)
         await sendMessage(chatId, "✅ 验证全部通过！\n\n您已获得7天免验证权限。")
-        // 不转发验证答案
-        return 
+        // 转发之前的那条触发验证的消息（B消息）
+        if (pendingMessageId) {
+          await normalForwardById(chatId, pendingMessageId)
+          await nfd.delete(`pending_msg-${chatId}`)
+        }
+        return
       }
     } else {
       return sendMessage(chatId, "❌ 答案错误，请重新回答上面的题目。")
     }
   }
 
-  // 需要生成新的验证码（用户发送的是真实消息，但还没验证够）
+  // 用户发送的是新消息，需要触发验证
   const captcha = generateCaptcha()
   await nfd.put(`current_answer-${chatId}`, captcha.answer, { expirationTtl: 600 })
+  await nfd.put(`pending_msg-${chatId}`, message.message_id, { expirationTtl: 600 }) // 记录这条消息
   return sendMessage(chatId, captcha.question)
 }
 
 async function normalForward(message) {
   const chatId = message.chat.id
   const forwardReq = await forwardMessage(ADMIN_UID, chatId, message.message_id)
-  
   if (forwardReq.ok) {
     await nfd.put('msg-map-' + forwardReq.result.message_id, chatId)
   }
 }
 
-// 屏蔽相关函数
+async function normalForwardById(chatId, messageId) {
+  const forwardReq = await forwardMessage(ADMIN_UID, chatId, messageId)
+  if (forwardReq.ok) {
+    await nfd.put('msg-map-' + forwardReq.result.message_id, chatId)
+  }
+}
+
+// 屏蔽相关函数（保持不变）
 async function handleBlock(message) {
   const guestId = await nfd.get('msg-map-' + message.reply_to_message.message_id, { type: "json" })
   if (guestId === ADMIN_UID) return sendMessage(ADMIN_UID, '不能屏蔽自己')
