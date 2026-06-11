@@ -98,12 +98,12 @@ async function handleAdminMessage(message) {
   }
 }
 
-// =============== 用户消息处理（已修复）===============
+// =============== 用户消息处理（核心修复）===============
 async function handleGuestMessage(message) {
   const chatId = message.chat.id
   const text = (message.text || '').trim()
 
-  // 检查90天免验证期
+  // 检查7天免验证期
   const verifiedUntil = await nfd.get(`verified_until-${chatId}`, { type: "json" })
   const now = Date.now()
 
@@ -118,28 +118,29 @@ async function handleGuestMessage(message) {
   // 正在等待验证答案
   if (currentAnswer) {
     if (text === currentAnswer) {
-      // 验证通过
       await nfd.delete(`current_answer-${chatId}`)
       verifyStep++
       await nfd.put(`verify_step-${chatId}`, verifyStep, { expirationTtl: 3600 })
 
       if (verifyStep === 1) {
         await sendMessage(chatId, "✅ 验证通过！\n剩余还需验证次数 1 次\n\n请继续发送您的消息。")
-        return normalForward(message)        // ← 关键修复：验证通过后转发当前消息
+        // 不转发验证答案
+        return 
       } 
       else if (verifyStep === 2) {
-        const expireTime = now + 90 * 24 * 60 * 60 * 1000
-        await nfd.put(`verified_until-${chatId}`, expireTime, { expirationTtl: 90 * 24 * 60 * 60 })
+        const expireTime = now + 7 * 24 * 60 * 60 * 1000   // 改为7天
+        await nfd.put(`verified_until-${chatId}`, expireTime, { expirationTtl: 7 * 24 * 60 * 60 })
         await nfd.delete(`verify_step-${chatId}`)
-        await sendMessage(chatId, "✅ 验证全部通过！\n\n您已获得90天免验证权限。")
-        return normalForward(message)        // ← 第二次验证通过也转发
+        await sendMessage(chatId, "✅ 验证全部通过！\n\n您已获得7天免验证权限。")
+        // 不转发验证答案
+        return 
       }
     } else {
       return sendMessage(chatId, "❌ 答案错误，请重新回答上面的题目。")
     }
   }
 
-  // 需要生成新的验证码
+  // 需要生成新的验证码（用户发送的是真实消息，但还没验证够）
   const captcha = generateCaptcha()
   await nfd.put(`current_answer-${chatId}`, captcha.answer, { expirationTtl: 600 })
   return sendMessage(chatId, captcha.question)
